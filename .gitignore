@@ -31,3 +31,7 @@ backend/configs/*
 
 # Files uploaded by users to the server
 **/bucket/
+# OGA Branding Configs
+portals/apps/oga-app/src/configs/
+!portals/apps/oga-app/src/configs/types.ts
+!portals/apps/oga-app/src/configs/default.yaml
