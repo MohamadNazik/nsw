@@ -135,10 +135,10 @@ OGA_NPQS_DB_PATH="${OGA_NPQS_DB_PATH:-./npqs.db}"
 OGA_FCAU_DB_PATH="${OGA_FCAU_DB_PATH:-./fcau.db}"
 OGA_IRD_DB_PATH="${OGA_IRD_DB_PATH:-./ird.db}"
 OGA_CDA_DB_PATH="${OGA_CDA_DB_PATH:-./cda.db}"
-OGA_APP_NPQS_INSTANCE_CONFIG="${OGA_APP_NPQS_INSTANCE_CONFIG:-npqs}"
-OGA_APP_FCAU_INSTANCE_CONFIG="${OGA_APP_FCAU_INSTANCE_CONFIG:-fcau}"
-OGA_APP_IRD_INSTANCE_CONFIG="${OGA_APP_IRD_INSTANCE_CONFIG:-ird}"
-OGA_APP_CDA_INSTANCE_CONFIG="${OGA_APP_CDA_INSTANCE_CONFIG:-cda}"
+OGA_APP_NPQS_BRANDING_PATH="${OGA_APP_NPQS_BRANDING_PATH:-./src/configs/npqs.yaml}"
+OGA_APP_FCAU_BRANDING_PATH="${OGA_APP_FCAU_BRANDING_PATH:-./src/configs/fcau.yaml}"
+OGA_APP_IRD_BRANDING_PATH="${OGA_APP_IRD_BRANDING_PATH:-./src/configs/ird.yaml}"
+OGA_APP_CDA_BRANDING_PATH="${OGA_APP_CDA_BRANDING_PATH:-./src/configs/cda.yaml}"
 
 OGA_NSW_NPQS_CLIENT_ID="${OGA_NSW_NPQS_CLIENT_ID:-NPQS_TO_NSW}"
 OGA_NSW_FCAU_CLIENT_ID="${OGA_NSW_FCAU_CLIENT_ID:-FCAU_TO_NSW}"
@@ -151,6 +151,27 @@ OGA_NSW_CDA_CLIENT_SECRET="${OGA_NSW_CDA_CLIENT_SECRET:-1234}"
 OGA_NSW_TOKEN_URL="${OGA_NSW_TOKEN_URL:-https://localhost:${IDP_PORT}/oauth2/token}"
 OGA_NSW_SCOPES="${OGA_NSW_SCOPES:-}"
 OGA_NSW_TOKEN_INSECURE_SKIP_VERIFY="${OGA_NSW_TOKEN_INSECURE_SKIP_VERIFY:-true}"
+
+ensure_branding_file() {
+  local config_dir="$ROOT_DIR/portals/apps/oga-app/src/configs"
+  local file_name="$1"
+  local app_name="$2"
+  local file_path="${config_dir}/${file_name}"
+  if [[ ! -f "$file_path" ]]; then
+    mkdir -p "$config_dir"
+    cat >"$file_path" <<EOF
+branding:
+  appName: "${app_name}"
+  logoUrl: ""
+  favicon: ""
+EOF
+  fi
+}
+
+ensure_branding_file "npqs.yaml" "National Plant Quarantine Service (NPQS)"
+ensure_branding_file "fcau.yaml" "Food Control Administration Unit (FCAU)"
+ensure_branding_file "ird.yaml" "Inland Revenue Department (IRD)"
+ensure_branding_file "cda.yaml" "Coconut Development Authority (CDA)"
 
 pids=()
 names=()
@@ -208,17 +229,17 @@ start_service "backend" "$ROOT_DIR/backend" env \
   go run ./cmd/server/main.go
 
 # OGA instance registry
-# Each row: name | backend_port | db_path | nsw_client_id | nsw_client_secret | app_port | instance_config | idp_client_id
+# Each row: name | backend_port | db_path | nsw_client_id | nsw_client_secret | app_port | branding_path | idp_client_id
 OGA_INSTANCES=(
-  "npqs|$OGA_NPQS_PORT|$OGA_NPQS_DB_PATH|$OGA_NSW_NPQS_CLIENT_ID|$OGA_NSW_NPQS_CLIENT_SECRET|$OGA_APP_NPQS_PORT|$OGA_APP_NPQS_INSTANCE_CONFIG|$NPQS_IDP_CLIENT_ID"
-  "fcau|$OGA_FCAU_PORT|$OGA_FCAU_DB_PATH|$OGA_NSW_FCAU_CLIENT_ID|$OGA_NSW_FCAU_CLIENT_SECRET|$OGA_APP_FCAU_PORT|$OGA_APP_FCAU_INSTANCE_CONFIG|$FCAU_IDP_CLIENT_ID"
-  "ird|$OGA_IRD_PORT|$OGA_IRD_DB_PATH|$OGA_NSW_IRD_CLIENT_ID|$OGA_NSW_IRD_CLIENT_SECRET|$OGA_APP_IRD_PORT|$OGA_APP_IRD_INSTANCE_CONFIG|$IRD_IDP_CLIENT_ID"
-  "cda|$OGA_CDA_PORT|$OGA_CDA_DB_PATH|$OGA_NSW_CDA_CLIENT_ID|$OGA_NSW_CDA_CLIENT_SECRET|$OGA_APP_CDA_PORT|$OGA_APP_CDA_INSTANCE_CONFIG|$CDA_IDP_CLIENT_ID"
+  "npqs|$OGA_NPQS_PORT|$OGA_NPQS_DB_PATH|$OGA_NSW_NPQS_CLIENT_ID|$OGA_NSW_NPQS_CLIENT_SECRET|$OGA_APP_NPQS_PORT|$OGA_APP_NPQS_BRANDING_PATH|$NPQS_IDP_CLIENT_ID"
+  "fcau|$OGA_FCAU_PORT|$OGA_FCAU_DB_PATH|$OGA_NSW_FCAU_CLIENT_ID|$OGA_NSW_FCAU_CLIENT_SECRET|$OGA_APP_FCAU_PORT|$OGA_APP_FCAU_BRANDING_PATH|$FCAU_IDP_CLIENT_ID"
+  "ird|$OGA_IRD_PORT|$OGA_IRD_DB_PATH|$OGA_NSW_IRD_CLIENT_ID|$OGA_NSW_IRD_CLIENT_SECRET|$OGA_APP_IRD_PORT|$OGA_APP_IRD_BRANDING_PATH|$IRD_IDP_CLIENT_ID"
+  "cda|$OGA_CDA_PORT|$OGA_CDA_DB_PATH|$OGA_NSW_CDA_CLIENT_ID|$OGA_NSW_CDA_CLIENT_SECRET|$OGA_APP_CDA_PORT|$OGA_APP_CDA_BRANDING_PATH|$CDA_IDP_CLIENT_ID"
 )
 
 # Launch OGA backends
 for entry in "${OGA_INSTANCES[@]}"; do
-  IFS='|' read -r name port db_path nsw_client_id nsw_client_secret app_port instance_config idp_client_id <<< "$entry"
+  IFS='|' read -r name port db_path nsw_client_id nsw_client_secret app_port branding_path idp_client_id <<< "$entry"
 
   start_service "oga-${name}" "$ROOT_DIR/oga" env \
     OGA_PORT="$port" \
@@ -257,11 +278,11 @@ start_service "trader-app" "$ROOT_DIR/portals/apps/trader-app" env \
 
 # Launch OGA portals
 for entry in "${OGA_INSTANCES[@]}"; do
-  IFS='|' read -r name port db_path nsw_client_id nsw_client_secret app_port instance_config idp_client_id <<< "$entry"
+  IFS='|' read -r name port db_path nsw_client_id nsw_client_secret app_port branding_path idp_client_id <<< "$entry"
 
   start_service "oga-app-${name}" "$ROOT_DIR/portals/apps/oga-app" env \
     VITE_PORT="$app_port" \
-    VITE_INSTANCE_CONFIG="$instance_config" \
+    VITE_BRANDING_PATH="$branding_path" \
     VITE_API_BASE_URL="http://localhost:${port}" \
     VITE_IDP_BASE_URL="$IDP_PUBLIC_URL" \
     VITE_IDP_CLIENT_ID="$idp_client_id" \
