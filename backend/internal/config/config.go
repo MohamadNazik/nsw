@@ -10,6 +10,7 @@ import (
 
 	"github.com/OpenNSW/nsw/internal/auth"
 	"github.com/OpenNSW/nsw/internal/database"
+	"github.com/OpenNSW/nsw/internal/temporal"
 	"github.com/OpenNSW/nsw/internal/uploads"
 	"github.com/OpenNSW/nsw/internal/validation"
 )
@@ -22,6 +23,7 @@ type Config struct {
 	Storage      uploads.Config
 	Auth         auth.Config
 	Notification NotificationConfig
+	Temporal     temporal.Config
 }
 
 // ServerConfig holds server configuration
@@ -118,6 +120,11 @@ func Load() (*Config, error) {
 			SMTPSender:   getEnvOrDefault("EMAIL_SMTP_SENDER", "noreply@nsw.local"),
 			TemplateRoot: getEnvOrDefault("EMAIL_TEMPLATE_ROOT", "./configs/email-templates"),
 		},
+		Temporal: temporal.Config{
+			Host:      getEnvOrDefault("TEMPORAL_HOST", "localhost"),
+			PortRaw:   getEnvOrDefault("TEMPORAL_PORT", "7233"),
+			Namespace: getEnvOrDefault("TEMPORAL_NAMESPACE", "default"),
+		},
 	}
 
 	// Validate required fields
@@ -144,6 +151,9 @@ func (c *Config) Validate() error {
 	}
 	if err := c.Auth.Validate(); err != nil {
 		return fmt.Errorf("invalid auth configuration: %w", err)
+	}
+	if err := c.Temporal.Validate(); err != nil {
+		return fmt.Errorf("invalid temporal configuration: %w", err)
 	}
 	if len(c.CORS.AllowedOrigins) == 0 {
 		return fmt.Errorf("CORS_ALLOWED_ORIGINS is required")
