@@ -47,13 +47,13 @@ func (h *Handler) HandleCreateUpload(w http.ResponseWriter, r *http.Request) {
 	// to make bypassing explicit for specific environments
 
 	r.Body = http.MaxBytesReader(w, r.Body, h.MaxRequestBytes)
-	var body json.RawMessage
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	var req UploadRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httputil.WriteJSONError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
-	result, err := h.service.CreateUploadURL(r.Context(), body)
+	result, err := h.service.CreateUploadURL(r.Context(), req)
 	if err != nil {
 		slog.ErrorContext(r.Context(), "failed to create upload URL", "error", err)
 		httputil.WriteJSONError(w, http.StatusInternalServerError, "Failed to create upload URL")

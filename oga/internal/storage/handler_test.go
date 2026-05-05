@@ -12,18 +12,18 @@ import (
 
 // mockService is a mock implementation of Service for testing
 type mockService struct {
-	mockCreateUploadURL func(ctx context.Context, payload []byte) (map[string]any, error)
-	mockGetDownloadURL  func(ctx context.Context, key string) (map[string]any, error)
+	mockCreateUploadURL func(ctx context.Context, req UploadRequest) (*FileMetadata, error)
+	mockGetDownloadURL  func(ctx context.Context, key string) (*DownloadMetadata, error)
 }
 
-func (m *mockService) CreateUploadURL(ctx context.Context, payload []byte) (map[string]any, error) {
+func (m *mockService) CreateUploadURL(ctx context.Context, req UploadRequest) (*FileMetadata, error) {
 	if m.mockCreateUploadURL != nil {
-		return m.mockCreateUploadURL(ctx, payload)
+		return m.mockCreateUploadURL(ctx, req)
 	}
 	return nil, nil
 }
 
-func (m *mockService) GetDownloadURL(ctx context.Context, key string) (map[string]any, error) {
+func (m *mockService) GetDownloadURL(ctx context.Context, key string) (*DownloadMetadata, error) {
 	if m.mockGetDownloadURL != nil {
 		return m.mockGetDownloadURL(ctx, key)
 	}
@@ -33,10 +33,11 @@ func (m *mockService) GetDownloadURL(ctx context.Context, key string) (map[strin
 func TestHandleCreateUpload(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		mockSvc := &mockService{
-			mockCreateUploadURL: func(ctx context.Context, payload []byte) (map[string]any, error) {
-				return map[string]any{
-					"key":        "123-abc",
-					"upload_url": "http://test/upload",
+			mockCreateUploadURL: func(ctx context.Context, req UploadRequest) (*FileMetadata, error) {
+				return &FileMetadata{
+					Key:       "123-abc",
+					Name:      "test.txt",
+					UploadURL: "http://test/upload",
 				}, nil
 			},
 		}
@@ -52,19 +53,22 @@ func TestHandleCreateUpload(t *testing.T) {
 			t.Errorf("expected status %d, got %d", http.StatusOK, rec.Code)
 		}
 
-		var resp map[string]any
+		var resp FileMetadata
 		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 			t.Fatalf("failed to parse response body: %v", err)
 		}
 
-		if resp["key"] != "123-abc" {
-			t.Errorf("expected key '123-abc', got %v", resp["key"])
+		if resp.Key != "123-abc" {
+			t.Errorf("expected key '123-abc', got %v", resp.Key)
+		}
+		if resp.UploadURL != "http://test/upload" {
+			t.Errorf("expected upload_url 'http://test/upload', got %v", resp.UploadURL)
 		}
 	})
 
 	t.Run("service error", func(t *testing.T) {
 		mockSvc := &mockService{
-			mockCreateUploadURL: func(ctx context.Context, payload []byte) (map[string]any, error) {
+			mockCreateUploadURL: func(ctx context.Context, req UploadRequest) (*FileMetadata, error) {
 				return nil, errors.New("upstream error")
 			},
 		}
@@ -85,10 +89,10 @@ func TestHandleCreateUpload(t *testing.T) {
 func TestHandleGetUploadURL(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		mockSvc := &mockService{
-			mockGetDownloadURL: func(ctx context.Context, key string) (map[string]any, error) {
-				return map[string]any{
-					"download_url": "http://test/download",
-					"expires_at":   float64(1234567890),
+			mockGetDownloadURL: func(ctx context.Context, key string) (*DownloadMetadata, error) {
+				return &DownloadMetadata{
+					DownloadURL: "http://test/download",
+					ExpiresAt:   1234567890,
 				}, nil
 			},
 		}
@@ -104,16 +108,16 @@ func TestHandleGetUploadURL(t *testing.T) {
 			t.Errorf("expected status %d, got %d. Body: %s", http.StatusOK, rec.Code, rec.Body.String())
 		}
 
-		var resp map[string]any
+		var resp DownloadMetadata
 		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 			t.Fatalf("failed to parse response body: %v", err)
 		}
 
-		if resp["download_url"] != "http://test/download" {
-			t.Errorf("expected download_url 'http://test/download', got %v", resp["download_url"])
+		if resp.DownloadURL != "http://test/download" {
+			t.Errorf("expected download_url 'http://test/download', got %v", resp.DownloadURL)
 		}
-		if resp["expires_at"] != float64(1234567890) { // JSON unmarshals ints to float64
-			t.Errorf("expected expires_at 1234567890, got %v", resp["expires_at"])
+		if resp.ExpiresAt != 1234567890 {
+			t.Errorf("expected expires_at 1234567890, got %v", resp.ExpiresAt)
 		}
 	})
 }
